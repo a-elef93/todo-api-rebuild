@@ -30,3 +30,34 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t todo-api:ci .
+
+  
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      POSTGRES_DB: todos
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and start services
+        run: docker compose up -d --build
+
+      - name: Smoke test
+        run: |
+          curl -sS --fail --retry 10 --retry-delay 2 --retry-all-errors localhost:5000/health
+
+          curl -sS --fail --retry 10 --retry-delay 2 --retry-all-errors \
+            -X POST -H "Content-Type: application/json" \
+            -d '{"title":"smoke"}' localhost:5000/todos
+
+          curl -sS --fail --retry 10 --retry-delay 2 --retry-all-errors localhost:5000/todos | grep "smoke"
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
+
